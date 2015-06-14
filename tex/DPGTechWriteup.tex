@@ -1,0 +1,203 @@
+\documentclass[a4paper]{article}
+
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage[colorinlistoftodos]{todonotes}
+
+\title{Deterministic Policy Gradient Julia Package Technical Documentation}
+\author{Christopher Ho}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This document is intended to provide a brief overview of theory and usage for the deterministic policy gradient Julia package.
+
+\section{Background}
+The deterministic policy gradient algorithm is a solution technique for problems formulated as a Markov Decision Process (MDP). A MDP is defined fundamentally as a 4 tuple, $\langle S,A,R,T \rangle$, which is the state space, action space, reward model, and transition model, respectively. 
+
+The state space is the set of all possible state configurations of the system, wherein the state is a set of variables that fully define everything an agent needs to know in order to take the optimal action. The action space is the set of all possible control efforts the agent is allowed to exert upon the system. The reward model measures the immediate utility of being in a state, $s$, and taking an action, $a$. Finally, the transition model gives the distribution over states, $s'$, that the environment might obtain given that it is currently in state $s$, and taking action $a$.
+
+A solution to a MDP is typically a value function, $V: S \mapsto\mathbb{R}$, which encodes at least some approximation to the maximum expected total reward, $V(s) = \mathbb{E} [\sum\limits_{t=1}^{T} R(s_t,a_t)\mid s_1 = s, a_t = \pi(s_t)]$, from a given state, $s$, or as a policy, $\pi: S \mapsto A$, which maps a state, $s$, to an action, $a$ so as to maximize expected total reward. Note that if the transition model is known, a policy can be extracted from the value function. 
+
+\section{Theory}
+The deterministic policy gradient is an actor-critic algorithm, which has a distinct representation for the value function (critic), and a distinct representation for the policy (actor). This algorithm assumes a specific functional form for the action-value function, that is:
+\begin{align}
+Q(s,a)& = A^{w}(s,a)+V^{v}(s)&\\
+& = \Big(\big(a-\mu_{\theta}(s)\big)^{\top}\bigtriangledown_{\theta}\mu_{\theta}(s)^{\top}\Big) + V^{v}(s)&
+\end{align}
+Where the second term is an approximation of the value function parameterized by some vector, $v$, and the first term is a linear approximation of the advantage from taking the current action as opposed to taking the actor's proposed action, $\mu_{\theta}(s)$. The ``features'' for the linear approximation of the advantage function are $\phi(s,a) = \bigtriangledown_{\theta}\mu_{\theta}(s)(a-\mu_{\theta}(s))$.
+
+This functional form gives the gradient of the action-value function with respect to actions a simple functional form:
+\begin{align}
+\bigtriangledown_{\theta}Q(s,a) &= \bigtriangledown_{\theta}\mu_{\theta}(s)\bigtriangledown_{a}Q(s,a)\mid a = \mu_{\theta}(s)\\
+&=\bigtriangledown_{\theta}\mu_{\theta}(s)(\bigtriangledown_{\theta}\mu_{\theta}(s)^{\top}w)
+\end{align}
+Alternatively, the natural gradient is simply $w$. Given the gradient, gradient ascent on the action value function can be performed.
+
+
+Note that the value function approximator is trained such that it minimizes the TD error. In this case, the value function is updated so as to minimize:
+\begin{align}
+\delta_t &= r_t +\gamma Q(s_{t+1},\mu_{\theta}(t+1)) - Q(s_t,a_t)\\
+& = r_t + V^{v}(s_{t+1}) - \bigg(\Big(\big(a_t-\mu_{\theta}(s_t)\big)^{\top}\bigtriangledown_{\theta}\mu_{\theta}(s_t)^{\top}\Big) + V^{v}(s_t)\bigg)
+\end{align}
+Where the advantage function in $t+1$ portion disappears because it is assumed that the agent does not explore, and only follows its current estimate of the optimal policy, which is the actor policy, $\mu_{\theta}(s)$. 
+Also note that the advantage function is updated in such a way to also minimize the same bellman error, albeit with respect to the parameter vector $w$.
+
+The complete COPDAC-Q algorithm for linear function approximators is governed by the following update rules:
+\begin{align}
+\delta_t &= r_t + Q(s_{t+1},\mu_{\theta}(s_{t+1})) - Q(s_t,a_t)\\
+\theta_{t+1} &= \theta_t + \alpha_{\theta}\bigtriangledown_{\theta}\mu_{\theta}(s)(\bigtriangledown_{\theta}\mu_{\theta}(s)^{\top}w)\\
+v_{t+1} &= v_t + \alpha_v \delta_t \phi(s_t)\\
+w_{t+1} &= w_t + \alpha_w \delta_t \phi(s_t,a_t)
+\end{align}
+
+\section{Usage}
+This implementation of the deterministic policy gradient algorithm requires only for a GenerativeModel type, and for the upper and lower bounds for each action dimension to be specified. As such, the user need only write four (4) functions:
+\begin{enumerate}
+\item init(rng): Generate a sample for the initial state of the system (may be deterministic)
+\item isEnd(s): True or false if the given state is terminal
+\item reward(s,a): Return a numerical reward
+\item getNext(rng,s,a): Given a state and an action, sample the next state
+\end{enumerate}
+
+A working example can be seen in examples/DPGTest.jl
+
+This implementaition of the Deterministic Policy Gradient algorithm has a large number of arguments for the main functions. Below is an attempt to clearly document each function and constructor.
+\subsection{train}
+train(GenerativeModel,AbstractRNG,Actor,Critic,Param,Solver,Updater)
+\begin{itemize}
+\item GenerativeModel: The problem formulation as stated above
+\item AbstractRNG: Something that extends AbstractRNG in Julia. MersenneTwister is recommended
+\item Actor: An initialized discrete actor object
+\item Critic: An initialized discrete critic object
+\item Param: An initialized distinct param object (holds miscellaneous parameters relevant to solution technique)
+\item Solver: An object that holds the selectAction, reset! and updateWeights! function, different for each instance of an Actor-Critic solution technique
+\item Updater: An object that holds relevant functions for the instance of an Actor-Critic solution technique. In this case for Deterministic Policy Gradient, it has getValue, gradient, actorUpdate!, and criticUpdate!
+\item Keyword Arguments:
+	\begin{itemize}
+	\item time\_horizon=20: the maximum length of a training episode before it is reset
+	\item num\_episodes=10: the number of training episodes
+	\item eps=0.5: the exploration constant. In this context it is the standard deviation of the exploration noise added to the actor policy during training as this value times the total range of each action dimension
+	\item alpha=[0.01]: the learning rate--note that deterministic policy gradient requires 3 learning rates, so this keyword argument must always be defined in the following order: $[\alpha_{\theta},\alpha_w,\alpha_v]$
+	\item gamma=0.99: the MDP discount factor
+	\item natural=false: whether the natural policy gradient is used
+	\item verbose=false: whether the function outputs information such as which training episode it is on
+	\item minibatch\_size=1: the number of experience tuples pooled into each update. For use with experience\_replay
+	\item experience\_replay=true: whether or not the algorithm will use experience replay
+	\end{itemize}
+\end{itemize}
+
+\subsection{simulate}
+simluate(GenerativeModel,AbstractRNG,AbstractRNG,Policy)
+\begin{itemize}
+\item GenerativeModel: the problem formulation
+\item AbstractRNG: the first is the RNG used for the nextState transition, the second is the RNG used for the actor(this is for a more general framework--deterministic policy gradient aptly does not use a RNG for its policies)
+\item Policy: action=policy(RNG,state)--a function that takes in a RNG and a state returned by either init or getNext, and returns an action compatible with bother reward and getNext
+\item Keyword Arguments:
+	\begin{itemize}
+	\item time\_horizon=20: length of the simulation
+	\item recordHist=false: whether or note the history (states and actions) of the system is recorded
+	\end{itemize}
+\end{itemize}
+
+\subsection{runSim}
+runSim(GenerativeModel,AbstractRNG,AbstractRNG,Policy)
+\begin{itemize}
+\item GenerativeModel: the problem formulation
+\item AbstractRNG: the first is the RNG used for the nextState transition, the second is the RNG used for the actor(this is for a more general framework--deterministic policy gradient aptly does not use a RNG for its policies)
+\item Policy: action=policy(RNG,state)--a function that takes in a RNG and a state returned by either init or getNext, and returns an action compatible with bother reward and getNext
+\item Keyword Arguments:
+	\begin{itemize}
+	\item time\_horizon=20: length of the simulation
+	\item recordHist=false: whether or note the history (states and actions) of the system is recorded
+	\item nSims=100: number of simulations to generate
+	\end{itemize}
+\end{itemize}
+
+\subsection{easyInit}
+easyInit(n,ub,lb,memory\_size,cv)
+\begin{itemize}
+\item n: the dimensionality of the state space
+\item ub: a 1d array of upper bounds on each action dimension (ordered by how you use it in getNext and reward)
+\item lb: the associated lower bound
+\item memory\_size: the number of memory tuples to retain for experience replay
+\item cv: the L2 regularization factor for the neural network approximation of the value function
+\item Keyword Arguments:
+	\begin{itemize}
+	\item cw=0.: the L2 regularization factor for the advantage function
+	\item cth=0.: the L2 regularization factor for the actor neural network
+	\item ActorLayers=[2.]: each element in this array represents a hidden layer consisting of n*value units. The first element is the hidden layer immediately following the input layer, and the last is the hidden layer immediately preceding the output layer
+	\item CriticLayers=[2.]: each element in this array represents a hidden layer consisting of n*value units. The first element is the hidden layer immediately following the input layer, and the last is the hidden layer immediately preceding the output layer
+	\item mu=0.9: the exponential decay for RMSProp, other common values include 0.99 and 0.999
+	\end{itemize}
+\end{itemize}
+
+
+\section{Practical Tips}
+\begin{itemize}
+\item The learning rate for the actor ($\alpha_{\theta}$) should be at least an order of magnitude slower than the learning rate for the critic ($\alpha_{v}$).
+\item It might be necessary to play with learning rates, the exploration constant, and number of training episodes in order to get a very good policy. Currently, there is a large amount of randomness in this implementation, via neural network initialization and potentially due to the transition models. As such several runs might be required to obtain a satisfactory policy
+\item Don't be alarmed if you see the estimates of the action-value decreasing--The algorithm work in such a way that the value function approximator must get close to the true value function before the actor can effectively update so as to ascend the policy gradient--you may just need to run the algorithm for more training episodes.
+\item This solution technique doesn't work especially well if rewards/costs are only incurred at the end. For example in the classic mountain car formulation, this solution technique will only improve the policy if it manages to reach a terminal state, which depends on the initial policy. 
+\end{itemize}
+
+\section{Extending Policy Gradient}
+Some efforts have been made to make this code reasonably extensible. Included with this release are a neural network and linear function approximation version of the deterministic policy gradient. 
+
+If you would like to use your own function approximators, you simply need to define the following functions:
+abcdefg
+And be sure to create outer constructors for Solver and Updater and export them in addition to GenerativeModel and at a minimum simulate for your module.
+
+\section{Other Functions}
+\subsection{NNDPGActor}
+NNDPCActor(NeuralNetwork,ub,lb,xu,xl,cth,mu=0.9)
+\begin{itemize}
+\item NeuralNetwork: an initialized neural network (the included simple implementation)
+\item ub: a 1d array of upper bounds on each action dimension (ordered by how you use it in getNext and reward)
+\item lb: the associated lower bound
+\item xu: array of upper bounds on your inputs (state). This is provided so that if your state space is bounded, then the inputs can be centered around [-1,1] for the neural network. If your inputs are not bounded in a nice way, use xu = [1...], xl = [-1...]
+\item xl: array of lower bounds on your inputs (state). This is provided so that if your state space is bounded, then the inputs can be centered around [-1,1] for the neural network. If your inputs are not bounded in a nice way, use xu = [1...], xl = [-1...]
+\item cth: the l2 regularization factor on the actor parameters. I have not played around with the effects of using it.
+\item mu=0.9: the exponential decay rate used for RMSProp update. Other typical values include 0.99 and 0.999
+\end{itemize}
+
+\subsection{NNDPGCritic}
+NNDPGCritic(NeuralNetwork,w,xu,xl,mu=0.9)
+\begin{itemize}
+\item NeuralNetwork: an initialized neural network (the included simple implementation)
+\item w: an initialization of the weight vector for the  advantage function
+\item xu: array of upper bounds on your inputs (state). This is provided so that if your state space is bounded, then the inputs can be centered around [-1,1] for the neural network. If your inputs are not bounded in a nice way, use xu = [1...], xl = [-1...]
+\item xl: array of lower bounds on your inputs (state). This is provided so that if your state space is bounded, then the inputs can be centered around [-1,1] for the neural network. If your inputs are not bounded in a nice way, use xu = [1...], xl = [-1...]
+\item mu=0.9: the exponential decay rate used for RMSProp update. Other typical values include 0.99 and 0.999
+\end{itemize}
+
+\subsection{NNDPGParam}
+NNDPGParam(capacity,cw)
+\begin{itemize}
+\item capacity: the number of memory tuples to retain for experience replay
+\item cw: the L2 regularization factor on the advantage function weight vector, $w$.
+\end{itemize}
+
+\subsection{buildNN}
+buildNN(sizes,c,yl,yu)
+\begin{itemize}
+\item sizes: an array of integers for the size of each layer sizes=[2;10;10;1] refers to 2 input nodes, 2 hidden layers with 10 units, and 1 output node
+\item c: the strength of the regularization parameter
+\item yl: the lower bound on the output
+\item yu: the upper bound on the output
+\item Keyword Arguments:
+	\begin{itemize}
+	\item neuron\_type=''relu'': what kind of activation is used for the input and hidden layers. Options include ``relu'', ``sigm'', ``tanh'', and ``leakyrelu''
+	\item reg\_type=''L2'': how regularization is performed. Options currently include ``L2'', and ``L1''
+	\item verbose=true: whether or not the system outputs information during training
+	\item init\_type=''rand'': how the weights and biases of the network are initialized. Options include ``rand'' and ``zero''. Note ``zero'' initialization is not recommended
+	\item output\_neuron\_type=''none'': what activation function the linear combination of activations from the last hidden layer is put through. Options include ``none'', ``relu'',''tanh'', ``sigm'', and ``leakyRel'u''. ``None'',''tanh'', or ``sigm'' are recommended depending on user requirements
+	\item scale=true: if the training data will be centered and whitened
+	\end{itemize}
+\end{itemize}
+
+\end{document}
