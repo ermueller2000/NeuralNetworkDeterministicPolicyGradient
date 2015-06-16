@@ -34,21 +34,21 @@ R_avg, hists = runSim(gm,simRNG,actRNG,policy,time_horizon=500,recordHist = fals
 ```
 
 Below is a brief overview of the less clear parameters
-```GenerativeModel```:
+#####`GenerativeModel`
 
-```init(AbstractRNG)```->```State```
-```getNext(AbstractRNG,State,Action)```->```State```
-```isEnd(State)```->```Bool```
-```reward(State,Action```->```Float```
+`init(AbstractRNG)`->`State`
+`getNext(AbstractRNG,State,Action)`->`State`
+`isEnd(State)`->`Bool`
+`reward(State,Action`->`Float`
 
-```easyInit```:
+#####`easyInit`
 
-```n```: dimensionality of state space
-```ub```,```lb```: upper and lower bound of each action dimension (Float arrays)
-```mem_size```: number of experience tuples to maintain in memory
-```cv```,```cw```,```cth```: L2 regularization term on the value critic, advantage critic, and actor respectively
-```ActorLayers```,```CriticLayers```: denotes the number of hidden layers and the size of each hidden layer as a factor of ```n```
-```neuron_type```: activation function in the hidden and input layers
+`n`: dimensionality of state space
+`ub`,`lb`: upper and lower bound of each action dimension (Float arrays)
+`mem_size`: number of experience tuples to maintain in memory
+`cv`,`cw`,`cth`: L2 regularization term on the value critic, advantage critic, and actor respectively
+`ActorLayers`,`CriticLayers`: denotes the number of hidden layers and the size of each hidden layer as a factor of ```n```
+`neuron_type`: activation function in the hidden and input layers
 
 It is recommended that the states and actions be represented as vectors of floats.
 
