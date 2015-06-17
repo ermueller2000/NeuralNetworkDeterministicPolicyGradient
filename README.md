@@ -7,7 +7,7 @@ Neural Network Deterministic policy gradient is a Julia implementation of a 2014
 ###Installation
 To install, simply run
 ```julia
-Pkg.clone("https://github.com/cho3/NeuralNetworkDeterministicPolicyGradient.jl.git")
+Pkg.clone("https://github.com/cho3/NeuralNetworkDeterministicPolicyGradient")
 ```
 Note: if you are behind a proxy server, you’ll need to configure git differently. The following commands should do it:
 ```julia
