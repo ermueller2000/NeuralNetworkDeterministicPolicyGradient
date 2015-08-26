@@ -79,6 +79,7 @@ function updateWeights!(gm::GenerativeModel,actor::DPGActor,critic::DPGCritic,p:
   else
     num_iters = 1
   end
+  assert(num_iters!=0)
   vs = zeros(num_iters)
   #I /think/ a for loop is equivalent to minibatching
   for i = 1:num_iters
@@ -105,6 +106,9 @@ function updateWeights!(gm::GenerativeModel,actor::DPGActor,critic::DPGCritic,p:
 
     critic.w += alpha[2]*(del*phi_sa - p.cw*critic.w) #<-regularization term
     #doesn't need a separate function because this has have this form because of compatible function blah blah blah
+    if isnan(v)
+      print("Critic value is nan on iteration $i. Overall vs is $vs\n")
+    end
     vs[i] = v
     if experience_replay
       mem = p.memory[rand(1:length(p.memory))]
@@ -113,6 +117,9 @@ function updateWeights!(gm::GenerativeModel,actor::DPGActor,critic::DPGCritic,p:
       r = mem.r
       s_ = mem.s_
     end
+  end
+  if isnan(mean(vs))
+    print("Mean of vs is nan: vs is $vs\n")
   end
   return mean(vs)#norm(critic.w)
 

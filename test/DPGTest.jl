@@ -2,14 +2,14 @@
 #TODO: make my own MDP.jl that has generative model, and simulate
 #TODO: Arrays are objects, make sure you're not passing the pointer when you should be making a copy...
 
-include("NN.jl")
-include("ActorCritic.jl")
-include("DPG.jl")
-#include("src\\LinDPG.jl")
-include("NNDPG.jl")
-include("MTNCAR.jl")
+# include("/home/emueller/.julia/v0.3/NeuralNetworkDeterministicPolicyGradient/src/NN.jl")
+# include("/home/emueller/.julia/v0.3/NeuralNetworkDeterministicPolicyGradient/src/ActorCritic.jl")
+# include("/home/emueller/.julia/v0.3/NeuralNetworkDeterministicPolicyGradient/src/DPG.jl")
+# #include("src\\LinDPG.jl")
+# include("/home/emueller/.julia/v0.3/NeuralNetworkDeterministicPolicyGradient/src/NeuralNetworkDeterministicPolicyGradient.jl")
+# include("/home/emueller/.julia/v0.3/NeuralNetworkDeterministicPolicyGradient/test/MTNCAR.jl")
 
-using MTNCAR, NNDPG
+using MTNCAR, NeuralNetworkDeterministicPolicyGradient
 
 function polynomial_basis(s::Array{Float64,1})
   #rescale to [-1,1]
@@ -61,7 +61,7 @@ phi = zeros(length(feature_function(s0)))
 init_ = (rng)->init()
 getNext_ = (rng,s,a)->nextState(s,a)
 isEnd_ = isEnd
-reward_ = reward
+reward_ = reward2
 
 gm = GenerativeModel(init_,getNext_,isEnd_,reward_)
 #=
@@ -77,11 +77,15 @@ updater = NNDPG.DPGUpdater()
 =#
 
 actor,critic,param, solver,updater = easyInit(2,[1.],[-1.],100,0.0001,
-                  cw=0.,cth=0.,ActorLayers=[5.],CriticLayers=[5.],mu=0.9)
+                  cw=0.,cth=0.,ActorLayers=[5.],CriticLayers=[5.],mu=0.9,neuron_type="tanh")
 
-alpha_th = 0.000001
-alpha_v = 0.0001
-alpha_w = 0.0001
+# alpha_th = 0.000001
+# alpha_v = 0.0001
+# alpha_w = 0.0001
+alpha_th = 0.0001
+alpha_v = 0.01
+alpha_w = 0.01
+
 
 #println(selectAction(gm,actor,critic,p,s,s0))
 #println(predict(actor.nn,s0))
@@ -93,8 +97,8 @@ trainRNG = MersenneTwister(100)
 simRNG = MersenneTwister(1000)
 actRNG = MersenneTwister(500)
 
-policy, hist = NNDPG.train(gm,trainRNG,actor, critic,param,solver,updater,
-               time_horizon=5000,num_episodes=10,eps = 0.5,alpha=[alpha_th; alpha_w;alpha_v],gamma=0.99,natural=true, verbose=true,eps=0.25)
+policy, hist = NeuralNetworkDeterministicPolicyGradient.train(gm,trainRNG,actor, critic,param,solver,updater,
+               time_horizon=5000,num_episodes=50,eps = 0.25,alpha=[alpha_th; alpha_w;alpha_v],gamma=0.99,natural=true, verbose=true,eps=0.25)
 
 #physics inspired (optimal?) heuristic
 #policy = (s)->s[2]>0.?1.:-1.
@@ -102,5 +106,5 @@ policy, hist = NNDPG.train(gm,trainRNG,actor, critic,param,solver,updater,
 
 println(methods(runSim))
 nSims = 100
-R_,hists = NNDPG.runSim(gm,simRNG,actRNG,policy,time_horizon=5000,recordHist=false,nSims=nSims,verbose=true)
+R_,hists = NeuralNetworkDeterministicPolicyGradient.runSim(gm,simRNG,actRNG,policy,time_horizon=5000,recordHist=true,nSims=nSims,verbose=true)
 

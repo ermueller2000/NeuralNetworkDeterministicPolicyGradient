@@ -209,6 +209,7 @@ function numericalGradient(actor::NNDPGActor,s)
       a2 = predict(nn2,scale_s(s,actor.xu,actor.xl))[1]
       g_[ind] = (a1-a2)./(2*eps)
   end
+  display(g_)
   dth = g_
   y = a1
 
@@ -241,6 +242,9 @@ end
 function batchUpdateWeights!(gm::GenerativeModel,actor::DPGActor,critic::DPGCritic,p::DPGParam,solver::Solver,u::DPGUpdater,
                         s,a,r,s_,endflag::Bool,
                         alpha::Array{Float64,1},gamma::Float64,natural::Bool=false,experience_replay::Bool=false,minibatch_size::Int=1)
+#print("in batchUpdateWeights\n")
+# logFileName = "testWeightUpdate7_6_15.txt"
+logFileName = ""
   assert(length(alpha) == 3)
 
   #For batching: aggregate target, state for criticupdate,
@@ -315,9 +319,10 @@ function batchUpdateWeights!(gm::GenerativeModel,actor::DPGActor,critic::DPGCrit
       batch_target[i] = r
     end
 
-
-
     #doesn't need a separate function because this has have this form because of compatible function blah blah blah
+    if isnan(v)
+      print("BatchupdateWeights!: Critic value is nan on iteration $i. num_iters is $num_iters. Overall vs is $vs\n")
+    end
     vs[i] = v
     #u.actorUpdate!(actor,critic,J,alpha[1],natural)
     #u.criticUpdate!(critic,r+gamma*Q_,Q,s,alpha[3])
@@ -339,8 +344,17 @@ function batchUpdateWeights!(gm::GenerativeModel,actor::DPGActor,critic::DPGCrit
   actor.nn.weights += (alpha[1]/num_iters)*dW/sqrt(actor.vW+1e-8)
   actor.nn.biases += (alpha[1]/num_iters)*db/sqrt(actor.vb+1e-8)
 
-  u.criticUpdate!(critic,batch_target,batch_advantage,batch_estimate,batch_s,alpha[3])
+  if !isempty(logFileName)
+      f=open(logFileName,"a")
+      println(f, "weight update: $((alpha[1]/num_iters)*dW/sqrt(actor.vW+1e-8))")
+      println(f, "bias update: $((alpha[1]/num_iters)*db/sqrt(actor.vb+1e-8))")
+      close(f)
+  end
 
+  u.criticUpdate!(critic,batch_target,batch_advantage,batch_estimate,batch_s,alpha[3])
+  if isnan(mean(vs))
+    print("Mean of vs is nan: vs is $vs\n")
+  end
   return mean(vs)#norm(critic.w)
 
 end

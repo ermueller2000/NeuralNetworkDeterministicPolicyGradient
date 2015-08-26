@@ -37,6 +37,7 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
 
   println()
   str = ""
+  strNan = ""
   for episode = 1:num_episodes
     Q=0.
     t = 0
@@ -55,7 +56,17 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
       if t == time_horizon
         endflag = true
       end
+
+      # In normal version (where easyInit uses solver("batchrmsprop"), the following will actually call batchUpdateWeights!() in NNDPG.jl)
       Q += solver.updateWeights!(gm,actor,critic,p,solver,u,s,a,r,s_,endflag,alpha,gamma,natural,experience_replay,minibatch_size)
+      if verbose
+        if isnan(Q)
+          print(repeat("\b \b",length(strNan)))
+          strNaN = "Q value has become NaN on episode $episode at time $t.  Exiting this training episode.\n"
+          print(str)
+          break
+        end
+      end
       if endflag
         #update statistics
         break
@@ -65,6 +76,9 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
       a = solver.selectAction(gm,rng,actor,critic,p,s,eps)
     end #t
     #sample state space to est. avg Q-value?
+    if isnan(Q)
+      break
+    end
     q[episode] = Q./t
   end#episodes
 
@@ -103,7 +117,9 @@ end
 
 function runSim(gm::GenerativeModel,simRNG::AbstractRNG,actRNG::AbstractRNG,policy::Function;time_horizon::Int=20,recordHist::Bool=false,nSims::Int=100,verbose::Bool=false)
   #just a function that runs a bunch of simulations and aggregates results
-  println()
+  if verbose
+    println()
+  end
   str = ""
   R = 0.
   histories = Dict{Int,History}()

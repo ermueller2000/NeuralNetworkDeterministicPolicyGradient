@@ -259,7 +259,7 @@ function train(X::Array{Float64,2},Y::Array{Float64,2},nn::NeuralNetwork,vW::NNW
         end
         #update weights, biases (maybe include another function to make this cleaner)
         #might be a cleaner way to do this (make a function over weights than nn holds?)
-
+        #print("in NN train")
         updateWeights!(nn, dW, db, vW, vb,alpha,mu,m,update_type)
 
         dW = zero(nn.weights)
@@ -308,7 +308,7 @@ end
 
 function updateWeights!(nn::NeuralNetwork, dW::NNWeights, db::NNWeights, vW::NNWeights, vb::NNWeights,
                        alpha::Float64,mu::Float64,m::Int,update_type::String)
-
+#print("in NN updateWeights\n")
   if nn.reg == "L2" || nn.reg == "Ridge"
     reg = deepcopy(nn.weights)
 
@@ -345,11 +345,22 @@ function updateWeights!(nn::NeuralNetwork, dW::NNWeights, db::NNWeights, vW::NNW
     nn.biases += (-alpha./m)*db
 
   elseif lowercase(update_type) == "rmsprop"
+    # Looks like this is the default update type, called from NN.train and NNDPG.RMSPropCriticUpdate! and NNDPG.batchUpdateWeights! and ActorCritic.train
     vW = mu*vW + (1-mu)*(dW)^2
     vb = mu*vb + (1-mu)*(db)^2
 
     nn.weights += (-alpha/m)*dW/sqrt(vW+1e-8)
     nn.biases += (-alpha/m)*db/sqrt(vb+1e-8)
+
+    #print("Weight addition: $((-alpha/m)*dW/sqrt(vW+1e-8))")
+    # if true in isnan(nn.weights)
+    #   print("weights are nan: $(nn.weights)\n")
+    # end
+    
+    #print("Bias addition: $((-alpha/m)*db/sqrt(vb+1e-8))")
+    # if true in isnan(nn.biases)
+    #   print("biases are nan: $(nn.biases)\n")
+    # end
 
   else
     error(string("No update rule: ",update_type))
@@ -423,6 +434,9 @@ function predict(nn::NeuralNetwork, x::Array{Float64,1})
     x_ = deepcopy(x)
   end
   y, a, z = feedforward(x_,nn)
+  # if true in isnan(y)
+  #   print("in NN.predict, y contains NaN with y=$y")
+  # end
   return y#.*((nn.yu-nn.yl)/2)+((nn.yl+nn.yu)/2)
 end
 
