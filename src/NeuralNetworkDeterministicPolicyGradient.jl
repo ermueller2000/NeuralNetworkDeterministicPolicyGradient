@@ -209,7 +209,10 @@ function numericalGradient(actor::NNDPGActor,s)
       a2 = predict(nn2,scale_s(s,actor.xu,actor.xl))[1]
       g_[ind] = (a1-a2)./(2*eps)
   end
-  display(g_)
+  if !isempty(g_[find(abs(g_).>1)])
+     display("Gradient element greater than 1:")
+     display(g_[find(abs(g_).>1)])
+  end
   dth = g_
   y = a1
 
@@ -288,6 +291,7 @@ logFileName = ""
     v = u.getValue(critic,s)
 
     J = u.gradient(actor,s) #a 2d array matrix
+    display(J)
     mu = solver.selectAction(gm,actor,critic,p,s,true) #special case
     phi_sa= J*(a-mu) #w is probably associated with some actor/critic object
     A = phi_sa'*critic.w
