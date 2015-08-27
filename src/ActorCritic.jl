@@ -31,7 +31,7 @@ end
 
 function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic,p::Param, solver::Solver,u::Updater;
                time_horizon::Int=20,num_episodes::Int=10,eps::Float64 = 0.5,alpha::Array{Float64,1}=[0.01],gamma::Float64=0.99,natural::Bool=false,
-               verbose::Bool=false,minibatch_size::Int=1,experience_replay::Bool=true)
+               verbose::Bool=false,minibatch_size::Int=1,experience_replay::Bool=true,gradient_clamp::Array{Float64,1}=[-Inf, Inf])
 
   q = zeros(num_episodes)
 
@@ -58,7 +58,7 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
       end
 
       # In normal version (where easyInit uses solver("batchrmsprop"), the following will actually call batchUpdateWeights!() in NNDPG.jl)
-      Q += solver.updateWeights!(gm,actor,critic,p,solver,u,s,a,r,s_,endflag,alpha,gamma,natural,experience_replay,minibatch_size)
+      Q += solver.updateWeights!(gm,actor,critic,p,solver,u,s,a,r,s_,endflag,alpha,gamma,natural,experience_replay,minibatch_size,gradient_clamp)
       if verbose
         if isnan(Q)
           print(repeat("\b \b",length(strNan)))
@@ -80,6 +80,12 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
       break
     end
     q[episode] = Q./t
+    if (mod(episode,100)==0)
+      display("Actor weights:")
+      display(actor.nn.weights)
+      display("Actor biases:")
+      display(actor.nn.biases)
+    end
   end#episodes
 
   return (rng,s)->solver.selectAction(gm,rng,actor,critic,p,s),q

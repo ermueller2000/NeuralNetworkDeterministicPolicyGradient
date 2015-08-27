@@ -209,10 +209,6 @@ function numericalGradient(actor::NNDPGActor,s)
       a2 = predict(nn2,scale_s(s,actor.xu,actor.xl))[1]
       g_[ind] = (a1-a2)./(2*eps)
   end
-  if !isempty(g_[find(abs(g_).>1)])
-     display("Gradient element greater than 1:")
-     display(g_[find(abs(g_).>1)])
-  end
   dth = g_
   y = a1
 
@@ -244,7 +240,7 @@ end
 
 function batchUpdateWeights!(gm::GenerativeModel,actor::DPGActor,critic::DPGCritic,p::DPGParam,solver::Solver,u::DPGUpdater,
                         s,a,r,s_,endflag::Bool,
-                        alpha::Array{Float64,1},gamma::Float64,natural::Bool=false,experience_replay::Bool=false,minibatch_size::Int=1)
+                        alpha::Array{Float64,1},gamma::Float64,natural::Bool=false,experience_replay::Bool=false,minibatch_size::Int=1, gradient_clamp::Array{Float64,1}=[-Inf,Inf])
 #print("in batchUpdateWeights\n")
 # logFileName = "testWeightUpdate7_6_15.txt"
 logFileName = ""
@@ -291,7 +287,11 @@ logFileName = ""
     v = u.getValue(critic,s)
 
     J = u.gradient(actor,s) #a 2d array matrix
-    display(J)
+    # if !isempty(J[find((J.>gradient_clamp[2]) | (J.<gradient_clamp[1]))])
+    #  display("Gradient outside limits:")
+    #  display(J[find((J.>gradient_clamp[2]) | (J.<gradient_clamp[1]))])
+    # end
+    clamp(J, gradient_clamp[1], gradient_clamp[2])
     mu = solver.selectAction(gm,actor,critic,p,s,true) #special case
     phi_sa= J*(a-mu) #w is probably associated with some actor/critic object
     A = phi_sa'*critic.w
