@@ -85,6 +85,10 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
       display(actor.nn.weights)
       display("Actor biases:")
       display(actor.nn.biases)
+      display("Critic weights:")
+      display(critic.nn.weights)
+      display("Critic biases:")
+      display(critic.nn.biases)
     end
   end#episodes
 

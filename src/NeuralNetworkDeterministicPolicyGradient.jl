@@ -291,7 +291,7 @@ logFileName = ""
     #  display("Gradient outside limits:")
     #  display(J[find((J.>gradient_clamp[2]) | (J.<gradient_clamp[1]))])
     # end
-    clamp(J, gradient_clamp[1], gradient_clamp[2])
+    #clamp(J, gradient_clamp[1], gradient_clamp[2])
     mu = solver.selectAction(gm,actor,critic,p,s,true) #special case
     phi_sa= J*(a-mu) #w is probably associated with some actor/critic object
     A = phi_sa'*critic.w
@@ -302,16 +302,30 @@ logFileName = ""
 
     dW_, db_ = u.actorUpdate!(actor,critic,J,alpha[1],natural)
 
+    # Should these be clamped to the same range as J?  Or should J even be clamped?
+    for ind=1:length(dW_)
+      clamp(dW_[ind], gradient_clamp[1], gradient_clamp[2])
+    end
+    for ind=1:length(db_)
+      clamp(db_[ind], gradient_clamp[1], gradient_clamp[2])
+    end
+    del_phi_sa = del*phi_sa
+    clamp(del_phi_sa, gradient_clamp[1], gradient_clamp[2])
+
     dW += dW_
     db += db_
 
+
     if i == 1
       batch_s = repmat(s,1,1)
-      batch_phi_sa = del*phi_sa
+      # batch_phi_sa = del*phi_sa  # For clamping, replaced this line with the following
+      batch_phi_sa = del_phi_sa
     else
       batch_s = hcat(batch_s,s)
-      batch_phi_sa += del*phi_sa
+      # batch_phi_sa += del*phi_sa  # For clamping, replaced this line with the following
+      batch_phi_sa += del_phi_sa
     end
+   # display("i=$i: dW update=$dW_, db update=$db_, phi_sa update=$(del*phi_sa), total dW=$dW, total db=$db, total phi_sa=$(batch_phi_sa), clamping=$(gradient_clamp)")
 
     batch_advantage[i] = A[1]
 
