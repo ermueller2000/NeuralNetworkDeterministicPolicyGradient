@@ -31,7 +31,11 @@ end
 
 function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic,p::Param, solver::Solver,u::Updater;
                time_horizon::Int=20,num_episodes::Int=10,eps::Float64 = 0.5,alpha::Array{Float64,1}=[0.01],gamma::Float64=0.99,natural::Bool=false,
-               verbose::Bool=false,minibatch_size::Int=1,experience_replay::Bool=true,gradient_clamp::Array{Float64,1}=[-Inf, Inf])
+               verbose::Bool=false,minibatch_size::Int=1,experience_replay::Bool=true,gradient_clamp::Array{Float64,1}=[-Inf, Inf], maLen::Int64=20,
+               trainValEnd::Float64=-15000., minTrainEps::Int64=250)
+  # Added three parameters that can be used to stop training before the total number of episodes is used.  The criterion averages the last maLen training 
+  # episode values (stored in q[]) and will stop when this moving average is largen than trainValEnd.  It will not stop when fewer than minTrainEps have
+  # been completed because the training value always starts at 0.
 
   q = zeros(num_episodes)
 
@@ -90,9 +94,18 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
       display("Critic biases:")
       display(critic.nn.biases)
     end
+
+    # If the average of the last maLen training episode q values exceed the trainValEnd threshold, stop training
+    if (episode>minTrainEps) & (episode>maLen)
+      trainVal = mean(q[episode-maLen+1:episode])
+      if trainVal > trainValEnd
+        break
+      end
+    end
+
   end#episodes
 
-  return (rng,s)->solver.selectAction(gm,rng,actor,critic,p,s),q
+  return (rng,s)->solver.selectAction(gm,rng,actor,critic,p,s),q[1:episode]
 end
 
 function simulate(gm::GenerativeModel,simRNG::AbstractRNG,actRNG::AbstractRNG,policy::Function;time_horizon::Int=20,recordHist::Bool=false)
