@@ -42,6 +42,7 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
   println()
   str = ""
   strNan = ""
+  maxEpisode = 0
   for episode = 1:num_episodes
     Q=0.
     t = 0
@@ -94,7 +95,7 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
       display("Critic biases:")
       display(critic.nn.biases)
     end
-
+    maxEpisode = episode
     # If the average of the last maLen training episode q values exceed the trainValEnd threshold, stop training
     if (episode>minTrainEps) & (episode>maLen)
       trainVal = mean(q[episode-maLen+1:episode])
@@ -105,7 +106,7 @@ function train(gm::GenerativeModel,rng::AbstractRNG,actor::Actor, critic::Critic
 
   end#episodes
 
-  return (rng,s)->solver.selectAction(gm,rng,actor,critic,p,s),q[1:episode]
+  return (rng,s)->solver.selectAction(gm,rng,actor,critic,p,s),q[1:maxEpisode]
 end
 
 function simulate(gm::GenerativeModel,simRNG::AbstractRNG,actRNG::AbstractRNG,policy::Function;time_horizon::Int=20,recordHist::Bool=false)
